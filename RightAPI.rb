@@ -48,6 +48,7 @@ require 'rest_client'
 @resid
 @puts_exceptions = true
 @reraise_exceptions = false
+@rs_cookies = ''
 
 attr_accessor :api_version, :log, :debug, :api_url, :log_file, :puts_exceptions, :reraise_exceptions
 
@@ -73,6 +74,10 @@ attr_accessor :api_version, :log, :debug, :api_url, :log_file, :puts_exceptions,
 			@log_file == nil ? RestClient.log = "#{@log_file_default}" : RestClient.log = "#{@log_file}"
 		end
 		@apiobject = RestClient::Resource.new("#{@api_call}",@username,@password)
+
+		# Get RightScale auth cookies
+		@rs_cookies = send('login', 'get', opts).cookies
+
 		rescue => e
 		puts "Error: #{e.message}" if @puts_exceptions
 		raise if @reraise_exceptions
@@ -80,13 +85,15 @@ attr_accessor :api_version, :log, :debug, :api_url, :log_file, :puts_exceptions,
 
 	def	send(apistring,type = "get", params = {})
 		@responsecode = ""
-		api_version= { :x_api_version => "#{@api_version}", :api_version => "#{@api_version}" }	
+		api_version = { :x_api_version => "#{@api_version}", :api_version => "#{@api_version}" }
 
 		raise "No API call given" if apistring.empty?
 		raise "Invalid Action: get | put | post | delete only" unless type.match(/(get|post|put|delete)/)
 	
-		@callstart = Time.now	
-    		@reply = @apiobject[apistring].send(type.to_sym, api_version.merge(params)) 
+		rs_params = [ api_version.merge(params) ]
+		rs_params << { :cookies => @rs_cookies } if @rs_cookies
+		@callstart = Time.now
+		@reply = @apiobject[apistring].send(type.to_sym, *rs_params)
 		@time = Time.now - @callstart 
 
 		@apiheader = @reply.headers
